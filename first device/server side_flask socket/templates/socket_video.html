@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SocketIO Camera Streaming</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body>
+    <h2>Flask-SocketIO Camera Stream</h2>
+    <video id="local" autoplay playsinline></video>
+    <img id="remote" />
+
+    <script>
+        const socket = io();
+        const video = document.getElementById('local');
+        const remote = document.getElementById('remote');
+
+        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+            video.srcObject = stream;
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            video.addEventListener('play', function () {
+                const draw = () => {
+                    if (video.paused || video.ended) return;
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0);
+                    const dataURL = canvas.toDataURL('image/jpeg', 0.2); // compress
+                    const now = Date.now();
+                    socket.emit('video_frame', {
+                        time: now,
+                        data: dataURL
+                    });
+                    setTimeout(draw, 200); // ~10 fps
+                };
+                draw();
+            });
+        });
+
+        socket.on('video_feed', function (data) {
+            remote.src = data;
+        });
+    </script>
+</body>
+</html>

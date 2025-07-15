@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SocketIO Camera Streaming</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h2>Flask-SocketIO Camera Stream</h2>
+    <video id="local" autoplay playsinline></video>
+    <img id="remote" />
+
+    <script>
+      const socket = io("http://192.168.0.135:5000"); // pastikan IP device 1
+      const video = document.getElementById("local");
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+
+      // Kirim video stream sendiri
+      navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+        video.srcObject = stream;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        video.addEventListener("play", function () {
+          const draw = () => {
+            if (video.paused || video.ended) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const dataURL = canvas.toDataURL("image/jpeg", 0.3);
+            const now = Date.now();
+            socket.emit("video_frame", {
+              time: now,
+              data: dataURL,
+            });
+            setTimeout(draw, 100);
+          };
+          draw();
+        });
+      });
+
+      // Tampung video dari client lain
+      const remoteVideos = {};
+
+      socket.on("video_feed", function (msg) {
+        const sid = msg.sid;
+        const data = msg.data;
+
+        if (!remoteVideos[sid]) {
+          const img = document.createElement("img");
+          img.style.width = "300px";
+          img.style.margin = "10px";
+          container.appendChild(img);
+          remoteVideos[sid] = img;
+        }
+
+        remoteVideos[sid].src = data;
+      });
+    </script>
+  </body>
+</html>
